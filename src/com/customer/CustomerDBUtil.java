@@ -1,207 +1,183 @@
 package com.customer;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class CustomerDBUtil {
-	
-	private static boolean isSuccess;
-	private static Connection con = null;
-	private static Statement stmt = null;
-	private static ResultSet rs = null;
-    
-	public static boolean validate(String userName, String password) {
-		
-		try {
-			con = DBConnect.getConnection();
-			stmt = con.createStatement();
-			String sql = "select * from users where username='"+userName+"' and password='"+password+"'";
-			rs = stmt.executeQuery(sql);
-			
-			if (rs.next()) {
-				isSuccess = true;
-			} else {
-				isSuccess = false;
-			}
-			
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-		return isSuccess;
-	}
-	
-	public static List<Customer> getCustomer(String userName) {
-		
-		ArrayList<Customer> customer = new ArrayList<>();
-		
-		try {
-			
-			con = DBConnect.getConnection();
-			stmt = con.createStatement();
-			String sql = "select * from users where username='"+userName+"'";
-			rs = stmt.executeQuery(sql);
-			
-			while (rs.next()) {
-				int id = rs.getInt(1);
-				String name = rs.getString(2);
-				String email = rs.getString(3);
-				String phone = rs.getString(4);
-				String address = rs.getString(5);
-				String username1 = rs.getString(6);
-				String password = rs.getString(7);
-				String role = rs.getString(8);
-				
-				Customer cus = new Customer(id,name,email,phone,address,username1,password,role);
-				customer.add(cus);
-			}
-			
-		} catch (Exception e) {
-			
-		}
-		
-		return customer;	
-	}
-    
-    public static boolean insertcustomer(String name, String email, String phone, String address, String username, String password, String role) {
-    	
-    	boolean isSuccess = false;
-    	
-    	try {
-    		con = DBConnect.getConnection();
-    		stmt = con.createStatement();
-    	    String sql = "insert into users values (0,'"+name+"','"+email+"','"+phone+"','"+address+"','"+username+"','"+password+"','"+role+"')";
-    		int rs = stmt.executeUpdate(sql);
-    		
-    		if(rs > 0) {
-    			isSuccess = true;
-    		} else {
-    			isSuccess = false;
-    		}
-    		
-    	}
-    	catch (Exception e) {
-    		e.printStackTrace();
-    	}
- 	
-    	return isSuccess;
+
+    private static Connection con = null;
+    private static PreparedStatement pstmt = null;
+    private static ResultSet rs = null;
+
+    // Validate user credentials
+    public static boolean validate(String userName, String password) {
+        boolean isSuccess = false;
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setString(1, userName);
+            pstmt.setString(2, password);
+            rs = pstmt.executeQuery();
+
+            isSuccess = rs.next();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return isSuccess;
     }
-    
-    public static boolean updatecustomer(String id, String name, String email, String phone, String address, String username, String password, String role) {
-    	
-    	try {
-    		
-    		con = DBConnect.getConnection();
-    		stmt = con.createStatement();
-    		String sql = "update users set name='"+name+"',email='"+email+"',phone='"+phone+"',address='"+address+"',username='"+username+"',password='"+password+"',role='"+role+"'"
-    				+ "where id='"+id+"'";
-    		int rs = stmt.executeUpdate(sql);
-    		
-    		if(rs > 0) {
-    			isSuccess = true;
-    		}
-    		else {
-    			isSuccess = false;
-    		}
-    		
-    	}
-    	catch(Exception e) {
-    		e.printStackTrace();
-    	}
-    	
-    	return isSuccess;
+
+    // Retrieve customer details by username
+    public static List<Customer> getCustomer(String userName) {
+        List<Customer> customers = new ArrayList<>();
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "SELECT * FROM users WHERE username = ?";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setString(1, userName);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Customer customer = extractCustomerFromResultSet(rs);
+                customers.add(customer);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return customers;
     }
- 
-    public static List<Customer> getCustomerDetails(String Id) {
-    	
-    	int convertedID = Integer.parseInt(Id);
-    	
-    	ArrayList<Customer> cus = new ArrayList<>();
-    	
-    	try {
-    		
-    		con = DBConnect.getConnection();
-    		stmt = con.createStatement();
-    		String sql = "select * from users where id='"+convertedID+"'";
-    		rs = stmt.executeQuery(sql);
-    		
-    		while(rs.next()) {
-    			int id = rs.getInt(1);
-    			String name = rs.getString(2);
-    			String email = rs.getString(3);
-    			String phone = rs.getString(4);
-    			String address = rs.getString(5);
-    			String username2 = rs.getString(6);
-    			String password = rs.getString(7);
-				String role = rs.getString(8);
-    			
-    			Customer c = new Customer(id,name,email,phone,address,username2,password,role);
-    			cus.add(c);
-    		}
-    		
-    	}
-    	catch(Exception e) {
-    		e.printStackTrace();
-    	}	
-    	return cus;	
+
+    // Insert a new customer
+    public static boolean insertCustomer(String name, String email, String phone, String address, String username, String password, String role) {
+        boolean isSuccess = false;
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "INSERT INTO users (name, email, phone, address, username, password, role) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setString(1, name);
+            pstmt.setString(2, email);
+            pstmt.setString(3, phone);
+            pstmt.setString(4, address);
+            pstmt.setString(5, username);
+            pstmt.setString(6, password);
+            pstmt.setString(7, role);
+
+            isSuccess = pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return isSuccess;
     }
-    
-    
-    public static boolean deleteCustomer(String id) {
-    	
-    	int convId = Integer.parseInt(id);
-    	
-    	try {
-    		
-    		con = DBConnect.getConnection();
-    		stmt = con.createStatement();
-    		String sql = "delete from users where id='"+convId+"'";
-    		int r = stmt.executeUpdate(sql);
-    		
-    		if (r > 0) {
-    			isSuccess = true;
-    		}
-    		else {
-    			isSuccess = false;
-    		}
-    		
-    	}
-    	catch (Exception e) {
-    		e.printStackTrace();
-    	}
-    	
-    	return isSuccess;
+
+    // Update existing customer details
+    public static boolean updateCustomer(int id, String name, String email, String phone, String address, String username, String password, String role) {
+        boolean isSuccess = false;
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "UPDATE users SET name = ?, email = ?, phone = ?, address = ?, username = ?, password = ?, role = ? WHERE id = ?";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setString(1, name);
+            pstmt.setString(2, email);
+            pstmt.setString(3, phone);
+            pstmt.setString(4, address);
+            pstmt.setString(5, username);
+            pstmt.setString(6, password);
+            pstmt.setString(7, role);
+            pstmt.setInt(8, id);
+
+            isSuccess = pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return isSuccess;
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+    // Retrieve customer details by ID
+    public static List<Customer> getCustomerDetails(int id) {
+        List<Customer> customers = new ArrayList<>();
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "SELECT * FROM users WHERE id = ?";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setInt(1, id);
+            rs = pstmt.executeQuery();
+
+            while (rs.next()) {
+                Customer customer = extractCustomerFromResultSet(rs);
+                customers.add(customer);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return customers;
+    }
+
+    // Delete a customer by ID
+    public static boolean deleteCustomer(int id) {
+        boolean isSuccess = false;
+
+        try {
+            con = DBConnect.getConnection();
+            String sql = "DELETE FROM users WHERE id = ?";
+            pstmt = con.prepareStatement(sql);
+            pstmt.setInt(1, id);
+
+            isSuccess = pstmt.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            closeResources();
+        }
+
+        return isSuccess;
+    }
+
+    // Helper method to extract customer data from ResultSet
+    private static Customer extractCustomerFromResultSet(ResultSet rs) throws Exception {
+        int id = rs.getInt("id");
+        String name = rs.getString("name");
+        String email = rs.getString("email");
+        String phone = rs.getString("phone");
+        String address = rs.getString("address");
+        String username = rs.getString("username");
+        String password = rs.getString("password");
+        String role = rs.getString("role");
+
+        return new Customer(id, name, email, phone, address, username, password, role);
+    }
+
+    // Close all database resources
+    private static void closeResources() {
+        try {
+            if (rs != null) rs.close();
+            if (pstmt != null) pstmt.close();
+            if (con != null) con.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
